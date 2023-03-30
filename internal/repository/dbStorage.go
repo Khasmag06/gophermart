@@ -25,8 +25,8 @@ type Storage interface {
 	Login(user *models.User) error
 	AddOrder(userID int, orderNum string) error
 	GetOrders(userID int) ([]*models.Order, error)
-	GetSumAccruals(userID int) (int, error)
-	GetSumWithdrawals(userID int) (int, error)
+	GetSumAccruals(userID int) (float64, error)
+	GetSumWithdrawals(userID int) (float64, error)
 	NewWithdrawal(userID int, withdraws *models.Withdraws) error
 	GetWithdrawals(userID int) ([]*models.Withdraws, error)
 	GetBalance(userID int) (*models.JSONBalance, error)
@@ -99,6 +99,7 @@ func (dbs *DBStorage) GetOrders(userID int) ([]*models.Order, error) {
 			return nil, err
 		}
 		order.UploadedAt = uploadedAt.Format(time.RFC3339)
+		order.Accrual = order.Accrual / 100
 		orders = append(orders, &order)
 
 	}
@@ -109,22 +110,22 @@ func (dbs *DBStorage) GetOrders(userID int) ([]*models.Order, error) {
 	return orders, nil
 }
 
-func (dbs *DBStorage) GetSumAccruals(userID int) (int, error) {
+func (dbs *DBStorage) GetSumAccruals(userID int) (float64, error) {
 	row := dbs.db.QueryRow("SELECT SUM(accrual) AS points FROM orders WHERE user_id = $1", userID)
-	var sumAccruals int
+	var sumAccruals float64
 	if err := row.Scan(&sumAccruals); err != nil {
 		return 0, err
 	}
-	return sumAccruals, nil
+	return sumAccruals / 100, nil
 }
 
-func (dbs *DBStorage) GetSumWithdrawals(userID int) (int, error) {
+func (dbs *DBStorage) GetSumWithdrawals(userID int) (float64, error) {
 	row := dbs.db.QueryRow("SELECT SUM(sum) FROM withdrawals WHERE user_id = $1", userID)
-	var sumWithdrawals int
+	var sumWithdrawals float64
 	if err := row.Scan(&sumWithdrawals); err != nil {
 		return 0, err
 	}
-	return sumWithdrawals, nil
+	return sumWithdrawals / 100, nil
 }
 
 func (dbs *DBStorage) NewWithdrawal(userID int, withdraws *models.Withdraws) error {
@@ -143,7 +144,7 @@ func (dbs *DBStorage) NewWithdrawal(userID int, withdraws *models.Withdraws) err
 	}
 
 	query := "INSERT INTO withdrawals (user_id, order_num, sum) VALUES ($1, $2, $3)"
-	_, err = dbs.db.Exec(query, userID, withdraws.Order, withdraws.Sum)
+	_, err = dbs.db.Exec(query, userID, withdraws.Order, withdraws.Sum*100)
 	if err != nil {
 		return err
 	}
@@ -167,6 +168,7 @@ func (dbs *DBStorage) GetWithdrawals(userID int) ([]*models.Withdraws, error) {
 			return nil, err
 		}
 		withdrawal.ProcessedAt = processedAt.Format(time.RFC3339)
+		withdrawal.Sum = withdrawal.Sum / 100
 		withdrawals = append(withdrawals, &withdrawal)
 	}
 
@@ -188,8 +190,8 @@ func (dbs *DBStorage) GetBalance(userID int) (*models.JSONBalance, error) {
 	}
 	currentBalance := accruals - withdrawals
 	var balance models.JSONBalance
-	balance.Current = float64(currentBalance)
-	balance.Withdrawn = float64(withdrawals)
+	balance.Current = currentBalance
+	balance.Withdrawn = withdrawals
 	return &balance, nil
 
 }
