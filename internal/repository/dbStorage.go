@@ -30,6 +30,7 @@ type Storage interface {
 	NewWithdrawal(userID int, withdraws *models.Withdraws) error
 	GetWithdrawals(userID int) ([]*models.Withdraws, error)
 	GetBalance(userID int) (*models.JSONBalance, error)
+	UpdateAccrual(accrual models.AccrualData) error
 }
 
 type DBStorage struct {
@@ -68,13 +69,13 @@ func (dbs *DBStorage) AddOrder(userID int, orderNum string) error {
 		if errors.As(err, &e) && e.Code == pgerrcode.UniqueViolation {
 			var id int
 			query = "SELECT user_id FROM orders WHERE order_num = $1"
-			if err := dbs.db.QueryRow(query, orderNum).Scan(&userID); err != nil {
+			if err := dbs.db.QueryRow(query, orderNum).Scan(&id); err != nil {
 				return err
 			}
-			if id == userID {
-				return ErrOrderUploadedByUser
-			} else {
+			if userID != id {
 				return ErrOrderUploadedByOtherUser
+			} else {
+				return ErrOrderUploadedByUser
 			}
 		}
 		return err
@@ -111,7 +112,7 @@ func (dbs *DBStorage) GetOrders(userID int) ([]*models.Order, error) {
 }
 
 func (dbs *DBStorage) GetSumAccruals(userID int) (float64, error) {
-	row := dbs.db.QueryRow("SELECT SUM(accrual) AS points FROM orders WHERE user_id = $1", userID)
+	row := dbs.db.QueryRow("SELECT coalesce(SUM(accrual), 0) AS points FROM orders WHERE user_id = $1", userID)
 	var sumAccruals float64
 	if err := row.Scan(&sumAccruals); err != nil {
 		return 0, err
@@ -120,7 +121,7 @@ func (dbs *DBStorage) GetSumAccruals(userID int) (float64, error) {
 }
 
 func (dbs *DBStorage) GetSumWithdrawals(userID int) (float64, error) {
-	row := dbs.db.QueryRow("SELECT SUM(sum) FROM withdrawals WHERE user_id = $1", userID)
+	row := dbs.db.QueryRow("SELECT coalesce(SUM(sum), 0) FROM withdrawals WHERE user_id = $1", userID)
 	var sumWithdrawals float64
 	if err := row.Scan(&sumWithdrawals); err != nil {
 		return 0, err
@@ -194,6 +195,14 @@ func (dbs *DBStorage) GetBalance(userID int) (*models.JSONBalance, error) {
 	balance.Withdrawn = withdrawals
 	return &balance, nil
 
+}
+
+func (dbs *DBStorage) UpdateAccrual(accrual models.AccrualData) error {
+	_, err := dbs.db.Exec(
+		"UPDATE orders SET status=$1, accrual=$2 WHERE order_num = $3",
+		accrual.Status, accrual.Accrual*100, accrual.Order,
+	)
+	return err
 }
 
 func NewDB(dsn string) (Storage, error) {

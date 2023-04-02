@@ -24,7 +24,7 @@ type JSONBalance struct {
 	Withdrawn float64 `json:"withdrawn"`
 }
 
-type accrualData struct {
+type AccrualData struct {
 	Order   string  `json:"order"`
 	Status  string  `json:"status"`
 	Accrual float64 `json:"accrual,omitempty"`

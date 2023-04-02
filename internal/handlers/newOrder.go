@@ -12,13 +12,14 @@ import (
 
 func (s *Service) NewOrder(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(middlewares.UserIDKey).(int)
-	order, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	order := string(body)
 
-	orderNum, err := strconv.Atoi(string(order))
+	orderNum, err := strconv.Atoi(order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -29,7 +30,7 @@ func (s *Service) NewOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.repo.AddOrder(userID, string(order)); err != nil {
+	if err := s.repo.AddOrder(userID, order); err != nil {
 		if errors.Is(err, repository.ErrOrderUploadedByUser) {
 			http.Error(w, err.Error(), http.StatusOK)
 			return
@@ -42,6 +43,6 @@ func (s *Service) NewOrder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
+	s.accrual.OrderQueue <- order
 	w.WriteHeader(http.StatusAccepted)
 }

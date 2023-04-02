@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Khasmag06/gophermart/config"
+	"github.com/Khasmag06/gophermart/internal/client"
 	"github.com/Khasmag06/gophermart/internal/handlers"
 	"github.com/Khasmag06/gophermart/internal/repository"
 	"github.com/go-chi/chi/v5"
@@ -19,8 +20,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to create database storage: %v", err)
 	}
-
-	s := handlers.NewService(*cfg, repo)
+	accrualClient := client.NewAccrual(cfg.AccrualSystemAddress, repo)
+	accrualClient.Run()
+	s := handlers.NewService(accrualClient, repo)
 	r := chi.NewRouter()
 
 	r.Mount("/", s.Route())

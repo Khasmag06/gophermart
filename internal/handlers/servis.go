@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"github.com/Khasmag06/gophermart/config"
+	"github.com/Khasmag06/gophermart/internal/client"
 	mw "github.com/Khasmag06/gophermart/internal/middlewares"
 	"github.com/Khasmag06/gophermart/internal/repository"
 	"github.com/go-chi/chi/v5"
@@ -9,12 +9,12 @@ import (
 )
 
 type Service struct {
-	cfg  config.Config
-	repo repository.Storage
+	accrual *client.Accrual
+	repo    repository.Storage
 }
 
-func NewService(cfg config.Config, repo repository.Storage) *Service {
-	return &Service{cfg, repo}
+func NewService(accrual *client.Accrual, repo repository.Storage) *Service {
+	return &Service{accrual, repo}
 }
 
 func (s *Service) Route() chi.Router {
